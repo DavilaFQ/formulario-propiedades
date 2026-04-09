@@ -584,9 +584,7 @@
             showLoading(true);
 
             try {
-                const formData = new FormData();
-                
-                // Añadir datos del formulario
+                // Collect form fields
                 const fields = [
                     'tipoPropiedad', 'operacion', 'precio', 'area', 'direccion',
                     'colonia', 'municipio', 'estado', 'habitaciones', 'banos',
@@ -594,42 +592,43 @@
                     'descripcion', 'amenidades'
                 ];
 
+                const payload = {};
                 fields.forEach(field => {
                     const input = form.elements[field];
-                    if (input) {
-                        formData.append(field, input.value || '');
-                    }
+                    if (input) payload[field] = input.value || '';
                 });
 
-                // Añadir imágenes
-                selectedFiles.forEach((file, index) => {
-                    formData.append(`imagen_${index}`, file);
+                // Convert images to base64
+                const toBase64 = file => new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve({
+                        name: file.name,
+                        type: file.type,
+                        data: reader.result.split(',')[1]
+                    });
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
                 });
 
-                // REEMPLAZA ESTO CON TU URL DE GOOGLE APPS SCRIPT
+                payload.imagenes = await Promise.all(selectedFiles.map(toBase64));
+
                 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzneA2KzIuSY-Emirp5NZq5jtctpQRE2OAAMTF8wstdldmtvDGTBYIPftOJn9NaC6kncg/exec';
-
-                if (SCRIPT_URL === 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI') {
-                    showLoading(false);
-                    showMessage('❌ Falta configurar la URL de Google Apps Script. Contacta al administrador.', 'error');
-                    return;
-                }
 
                 const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    body: formData
+                    body: JSON.stringify(payload)
                 });
 
-                if (response.ok) {
+                const result = await response.json();
+
+                if (result.result === 'success') {
                     showMessage('✅ ¡Propiedad enviada correctamente! Los datos se están organizando en carpetas.', 'success');
                     form.reset();
                     selectedFiles = [];
                     imagePreview.innerHTML = '';
-                    
-                    // Scroll arriba
                     window.scrollTo(0, 0);
                 } else {
-                    showMessage('❌ Error al enviar. Intenta de nuevo.', 'error');
+                    showMessage('❌ Error: ' + (result.mensaje || 'Intenta de nuevo.'), 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);

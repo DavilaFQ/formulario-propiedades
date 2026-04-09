@@ -430,9 +430,9 @@
                 <div class="section-divider"></div>
 
                 <!-- CARACTERÍSTICAS -->
-                <div class="form-group">
+                <div class="form-group" id="group-habitaciones">
                     <label>Habitaciones <span class="required">*</span></label>
-                    <select name="habitaciones" required>
+                    <select name="habitaciones" id="habitaciones" required>
                         <option value="">Selecciona cantidad</option>
                         <option value="0">Estudio</option>
                         <option value="1">1 Habitación</option>
@@ -443,9 +443,9 @@
                     </select>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" id="group-banos">
                     <label>Baños <span class="required">*</span></label>
-                    <select name="banos" required>
+                    <select name="banos" id="banos" required>
                         <option value="">Selecciona cantidad</option>
                         <option value="1">1 Baño</option>
                         <option value="1.5">1.5 Baños</option>
@@ -457,7 +457,7 @@
                     </select>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" id="group-estacionamientos">
                     <label>Estacionamientos</label>
                     <select name="estacionamientos">
                         <option value="">Sin especificar</option>
@@ -538,6 +538,17 @@
 
         let selectedFiles = [];
 
+        // Mostrar/ocultar campos según tipo de propiedad
+        const NO_INDOOR = ['terreno', 'lote'];
+        document.querySelector('[name="tipoPropiedad"]').addEventListener('change', function() {
+            const hide = NO_INDOOR.includes(this.value);
+            ['group-habitaciones', 'group-banos', 'group-estacionamientos'].forEach(id => {
+                document.getElementById(id).style.display = hide ? 'none' : '';
+            });
+            document.getElementById('habitaciones').required = !hide;
+            document.getElementById('banos').required = !hide;
+        });
+
         // Manejo de imágenes
         imageInput.addEventListener('change', function(e) {
             selectedFiles = Array.from(e.target.files);
@@ -598,16 +609,25 @@
                     if (input) payload[field] = input.value || '';
                 });
 
-                // Convert images to base64
-                const toBase64 = file => new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve({
-                        name: file.name,
-                        type: file.type,
-                        data: reader.result.split(',')[1]
-                    });
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
+                // Compress + convert images to base64
+                const toBase64 = (file) => new Promise((resolve) => {
+                    const img = new Image();
+                    const url = URL.createObjectURL(file);
+                    img.onload = () => {
+                        const MAX = 2000;
+                        let w = img.width, h = img.height;
+                        if (w > MAX || h > MAX) {
+                            if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+                            else { w = Math.round(w * MAX / h); h = MAX; }
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = w; canvas.height = h;
+                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                        const data = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+                        URL.revokeObjectURL(url);
+                        resolve({ name: file.name.replace(/\.[^.]+$/, '.jpg'), type: 'image/jpeg', data });
+                    };
+                    img.src = url;
                 });
 
                 payload.imagenes = await Promise.all(selectedFiles.map(toBase64));
